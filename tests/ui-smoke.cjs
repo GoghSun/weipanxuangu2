@@ -1,0 +1,66 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+let playwright;
+try { playwright = require('playwright'); } catch { playwright = require('/tmp/futures-ui-check/node_modules/playwright'); }
+const executable = process.env.CHROMIUM_PATH || '/tmp/futures-browsers/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell';
+const base = process.env.WEIPAN_URL || 'http://127.0.0.1:8766';
+(async () => {
+  const browser = await playwright.chromium.launch({headless:true, ...(fs.existsSync(executable)?{executablePath:executable}:{}),args:['--no-sandbox']});
+  const page = await browser.newPage({viewport:{width:1600,height:1100},deviceScaleFactor:1});
+  const errors=[];
+  page.on('pageerror',error=>errors.push(error.message));
+  await page.goto(base);
+  await page.waitForFunction(()=>state.defaults&&!state.busy);
+  await page.locator('#reset-btn').click();
+  await page.locator('#run-btn').click();
+  await page.waitForFunction(()=>document.querySelector('#result-mode').textContent.includes('演示')&&!document.querySelector('#run-btn').disabled);
+  assert.match(await page.locator('#source-notice').textContent(),/演示/);
+  assert.ok(await page.locator('#equity-chart path').count()>=3);
+  await page.screenshot({path:'/tmp/weipan-desktop.png',fullPage:true});
+  await page.locator('[name=stop_loss]').fill('3');
+  assert.equal(await page.locator('#dirty-note').isVisible(),true);
+  await page.locator('#reset-btn').click();
+  assert.equal(await page.locator('[name=stop_loss]').inputValue(),'2');
+  await page.locator('[data-tab=trades]').click();
+  assert.equal(await page.locator('#export-btn').isVisible(),true);
+  const downloadPromise=page.waitForEvent('download');
+  await page.locator('#export-btn').click();
+  const download=await downloadPromise;
+  await download.saveAs('/tmp/weipan-trades.csv');
+  assert.ok(fs.readFileSync('/tmp/weipan-trades.csv','utf8').includes('卖出原因'));
+  await page.locator('[data-tab=holdings]').click();
+  assert.match(await page.locator('#table-description').textContent(),/可用现金/);
+  await page.locator('[data-tab=history]').click();
+  await page.locator('.history-load').first().click();
+  await page.waitForFunction(()=>document.querySelector('#dirty-note').classList.contains('hidden'));
+  assert.equal(await page.locator('#dirty-note').isVisible(),false);
+  await page.locator('[name=start_date]').fill('2026-08-03');
+  await page.locator('[name=end_date]').fill('2026-08-14');
+  await page.locator('[name=mode]').selectOption('minute');
+  await page.locator('#run-btn').click();
+  await page.waitForFunction(()=>document.querySelector('#result-mode').textContent.includes('当日尾盘')&&!document.querySelector('#run-btn').disabled);
+  assert.equal(await page.locator('#error-panel').isVisible(),false);
+  await page.locator('#screen-btn').click();
+  await page.waitForFunction(()=>document.querySelector('#result-title').textContent==='尾盘选股结果'&&!document.querySelector('#run-btn').disabled);
+  assert.equal(await page.locator('#error-panel').isVisible(),false);
+  assert.match(await page.locator('#metric-return').textContent(),/—/);
+  await page.locator('#only-match').check();
+  assert.equal(await page.locator('#only-match').isChecked(),true);
+  // Restore default overview for a useful initial page on the next visit.
+  await page.locator('#reset-btn').click();
+  await page.locator('#run-btn').click();
+  await page.waitForFunction(()=>document.querySelector('#result-title').textContent==='策略回测概览'&&!document.querySelector('#run-btn').disabled);
+  await page.locator('#only-match').uncheck();
+  for(const width of [1440]){
+    await page.setViewportSize({width,height:1000});
+    const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth);
+    assert.equal(overflow,false,`No page overflow at ${width}px`);
+    await page.screenshot({path:`/tmp/weipan-${width}.png`,fullPage:true});
+  }
+  assert.deepEqual(errors,[]);
+  const invalid=await page.request.post(`${base}/api/backtest`,{data:{ma_fast:5,ma_slow:3}});
+  assert.equal(invalid.status(),400);
+  console.log(JSON.stringify({status:'passed',viewports:[1600,1440],checks:['demo backtest','parameter editing','reset','CSV export','history restore','strict minute backtest','tail screening','desktop layout','API validation'],pageErrors:errors}));
+  await browser.close();
+})().catch(error=>{console.error(error);process.exit(1);});

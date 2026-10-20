@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#f5f7f8"><title>尾盘 · 策略研究工作台</title>
+  <script>
+    // Opening this file directly must use the local service for scripts and API data.
+    if (location.protocol === 'file:') {
+      location.replace('http://127.0.0.1:8766/' + location.search + location.hash);
+    }
+  </script>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <aside class="sidebar">
+    <a class="brand" href="/" aria-label="尾盘首页"><span class="brand-mark"><i></i><i></i><i></i></span><strong>尾盘<span>WEIPAN LAB</span></strong></a>
+    <div class="workspace-label">研究空间 <span>个人</span></div>
+    <nav aria-label="主导航">
+      <button class="nav-item active" data-nav="overview"><span>◫</span>策略工作台</button>
+      <button class="nav-item" data-nav="signals"><span>⌕</span>尾盘选股</button>
+      <button class="nav-item" data-nav="trades"><span>⇄</span>交易记录</button>
+      <button class="nav-item" data-nav="history"><span>◷</span>回测历史</button>
+    </nav>
+    <div class="sidebar-note"><span class="tiny-label">THE LAST 30 MINUTES</span><div class="clock">14:30 <span>→</span> 15:00</div><p>等待缩量横盘<br>捕捉尾盘放量信号</p><div class="session-tag"><span class="dot"></span>A 股 · T+1</div></div>
+    <div class="sidebar-bottom"><span class="avatar">研</span><div>本地研究空间<small>数据与回测保存在本机</small></div><span class="local-dot"></span></div>
+  </aside>
+  <main>
+    <header class="topbar"><div class="breadcrumb">研究空间 <span>/</span> <strong id="page-crumb">策略工作台</strong></div><div class="top-status"><span class="dot"></span><span id="health-label">本地引擎就绪</span><span class="divider"></span><time id="today-label"></time></div></header>
+    <div class="page">
+      <section class="page-heading"><div><div class="eyebrow">STRATEGY WORKBENCH <span>V1.0</span></div><h1>把握尾盘的量价信号<span class="heading-dot">.</span></h1><p>小中盘 · 涨停基因 · 横盘蓄势 · 放量确认</p></div><button class="button ghost" id="reset-btn"><span>↺</span> 恢复默认参数</button></section>
+      <div class="notice" id="source-notice"><span class="notice-icon">i</span><div><strong>演示模式</strong><span>当前使用合成行情验证策略流程，不代表真实市场收益。切换 AKShare 后可下载真实数据。</span></div><span class="notice-tag">SAMPLE DATA</span></div>
+      <div class="workspace-grid">
+        <section class="parameter-panel card" aria-label="策略参数">
+          <div class="panel-title"><h2><span class="panel-icon">☷</span> 策略参数</h2><span class="small-tag">可编辑</span></div>
+          <form id="strategy-form">
+            <input name="strategy_version" type="hidden" value="2"><input name="volume_recent" type="hidden" value="1">
+            <div class="parameter-group"><h3><span class="step">01</span> 数据与回测区间</h3>
+              <label>数据来源<select name="source"><option value="demo">合成演示数据</option><option value="akshare">AKShare · 真实 A 股数据</option></select></label>
+              <label>执行模式<select name="mode"><option value="minute">当日尾盘买入 · 5 分钟回放</option></select></label>
+              <div class="field-row dates"><label>开始日期<input name="start_date" type="date" required></label><label>结束 / 选股日期<input name="end_date" type="date" required></label></div>
+              <p class="field-note" id="mode-note">当日 14:30 后选股，同日下一根 5 分钟 K 线开盘成交。</p>
+              <button type="button" class="text-button recent-range-button" id="recent-range-btn">使用最近一周区间</button>
+            </div>
+            <div class="parameter-group universe-group"><h3>回测股票池 <span class="pool-count" id="pool-count">— 只</span></h3>
+              <div class="field-row"><label>导入数量<select name="universe_limit"><option value="300">300 只</option><option value="500">500 只</option><option value="1000">1000 只</option><option value="0">全部匹配股票</option></select></label><label>股票范围<select name="universe_scope"><option value="market_cap">当前市值范围</option><option value="all">全部沪深 A 股</option></select></label></div>
+              <button type="button" class="button import-button" id="universe-btn">↓ 更新 / 扩大股票池</button>
+              <p class="field-note" id="pool-note">股票池不限于 30 只。首次下载较慢，历史行情会保存在本机并复用。</p>
+              <details class="symbols-editor"><summary>查看 / 编辑股票代码 <span>＋</span></summary><textarea name="symbols" rows="5" required aria-label="股票代码"></textarea></details>
+              <p class="field-note">当前市值导入存在历史选择偏差；回测中仍逐日核验历史总市值。</p>
+            </div>
+            <div class="parameter-group"><h3><span class="step">02</span> 入场条件 <span class="all-tag">全部满足</span></h3>
+              <label>总市值区间<div class="range-input"><div class="unit-input"><input name="market_cap_min" type="number" min="0.1" max="100000" step="0.1" required><span>亿</span></div><b>—</b><div class="unit-input"><input name="market_cap_max" type="number" min="0.1" max="100000" step="0.1" required><span>亿</span></div></div></label>
+              <div class="field-row"><label>涨停回看<div class="unit-input"><input name="limit_lookback" type="number" min="1" max="250" required><span>交易日</span></div></label><label>涨停口径<select name="limit_type"><option value="close">收盘涨停</option><option value="touch">盘中触及</option></select></label></div>
+              <div class="field-row"><label>横盘窗口 ≥<div class="unit-input"><input name="sideways_days" type="number" min="2" max="120" required><span>日</span></div></label><label>区间振幅 ≤<div class="unit-input"><input name="sideways_range" type="number" min="0.1" max="100" step="0.1" required><span>%</span></div></label></div>
+              <p class="field-note">区间振幅 =（窗口最高价 ÷ 最低价 − 1）× 100%</p>
+              <div class="volume-box"><div class="volume-equation"><span class="current-volume-label">当日累计量</span><span class="formula-divide">÷</span><label>此前<input name="volume_base" type="number" min="1" max="120" required><span>日均量</span></label></div><label class="volume-threshold">放量倍数 &gt;<div class="unit-input"><input name="volume_ratio" type="number" min="0.1" max="50" step="0.1" required><span>倍</span></div></label><p class="field-note">当日量只累计到选股时点；均量取此前完整交易日，不包含当日。等于阈值不买入。</p></div>
+              <label>尾盘选股时间<select name="selection_time"><option>14:30</option><option>14:35</option><option>14:40</option><option>14:45</option><option>14:50</option><option>14:55</option></select></label>
+            </div>
+            <div class="parameter-group entry-filter-group" id="entry-filter-group"><h3>买入当日确认 <span class="all-tag">新增条件</span></h3>
+              <label>当日买入过滤<select name="entry_filters"><option value="on">开启 · 三项全部满足</option><option value="off">关闭 · 使用原入场条件</option></select></label>
+              <div id="entry-filter-fields">
+                <div class="field-row"><label>价格站上均线<div class="unit-input"><input name="entry_ma_days" type="number" min="2" max="250" required><span>日</span></div></label><label>14:30 涨幅 &gt;<div class="unit-input"><input name="gain_1430_min" type="number" min="0" max="30" step="0.1" required><span>%</span></div></label></div>
+                <p class="field-note">MA 包含选股时价格；14:30 涨幅相对前收盘价计算，等于阈值不买入。</p>
+                <label>爆量基准：此前完整交易日<div class="unit-input"><input name="burst_volume_days" type="number" min="1" max="120" required><span>日</span></div></label>
+                <div class="field-row"><label>当日累计量 ≥<div class="unit-input"><input name="burst_volume_ratio" type="number" min="0.1" max="50" step="0.1" required><span>倍</span></div></label><label>上影线占振幅 ≥<div class="unit-input"><input name="upper_shadow_pct" type="number" min="0.1" max="100" step="0.1" required><span>%</span></div></label></div>
+                <p class="field-note">量能与上影线同时达到阈值才排除。上影线 = 最高价 − max(开盘价，选股时价格)；振幅 = 最高价 − 最低价，均只统计到选股时点。</p>
+              </div>
+              <p class="field-note entry-mode-note" id="entry-mode-note">开启后使用严格尾盘模式。免费分钟行情通常只覆盖近期，建议先选近期区间。</p>
+            </div>
+            <div class="parameter-group"><h3><span class="step">03</span> 离场与资金管理</h3>
+              <div class="field-row"><label>固定止损<div class="unit-input"><input name="stop_loss" type="number" min="0.1" max="50" step="0.1" required><span>%</span></div></label><label>最大持仓<div class="unit-input"><input name="max_positions" type="number" min="1" max="100" required><span>只</span></div></label></div>
+              <div class="ma-rule"><label>MA<input name="ma_fast" type="number" min="1" max="120" required></label><span>下穿</span><label>MA<input name="ma_slow" type="number" min="2" max="250" required></label><span class="profit-tag">盈利卖出</span></div>
+              <label>初始资金<div class="unit-input"><input name="initial_cash" type="number" min="10000" max="10000000000" step="10000" required><span>元</span></div></label>
+            </div>
+            <details class="parameter-group advanced"><summary>交易费用 <span>＋</span></summary><div class="field-row"><label>佣金 %<input name="commission" type="number" min="0" max="5" step="0.001" required></label><label>最低佣金 / 元<input name="min_commission" type="number" min="0" max="100" step="1" required></label></div><div class="field-row"><label>卖出印花税 %<input name="stamp_tax" type="number" min="0" max="5" step="0.001" required></label><label>双边过户费 %<input name="transfer_fee" type="number" min="0" max="1" step="0.001" required></label></div><label>单边滑点 %<input name="slippage" type="number" min="0" max="5" step="0.01" required></label></details>
+            <div class="run-area"><button class="button primary" type="submit" id="run-btn"><span>▷</span> 运行策略回测</button><button class="button secondary" type="button" id="screen-btn">⌕ 按指定日期进行尾盘选股</button><p>研究信号 · 未连接券商交易</p></div>
+          </form>
+        </section>
+        <div class="results-column">
+          <div class="result-heading"><div><span class="live-indicator"></span><h2 id="result-title">策略回测概览</h2><span id="result-mode" class="small-tag">等待运行</span></div><span id="result-date">设置参数，开始一次研究</span></div>
+          <div id="progress-panel" class="progress-panel hidden" role="status"><div><span class="spinner"></span><span id="progress-message">准备运行…</span><b id="progress-number">0%</b></div><div class="progress-track"><i id="progress-bar"></i></div></div>
+          <div id="error-panel" class="error-panel hidden" role="alert"></div>
+          <div id="dirty-note" class="dirty-note hidden">参数已修改，以下仍是上一次运行结果。重新运行后更新。</div>
+          <div id="entry-result-note" class="entry-result-note hidden"><span>旧版记录仅供查阅，当前策略需重新回测。</span><button type="button" class="text-button" id="apply-entry-btn">使用当前尾盘规则</button></div>
+          <section class="metrics" aria-label="回测指标">
+            <article class="metric card"><span>策略累计收益 <i>↗</i></span><strong id="metric-return">—<small>%</small></strong><p id="metric-annual">年化收益 —</p><svg viewBox="0 0 90 24" class="spark" aria-hidden="true"><path d="M0 20 L12 18 L22 20 L33 13 L45 15 L57 7 L66 11 L80 3 L90 5"/></svg></article>
+            <article class="metric card"><span>最大回撤 <i>↘</i></span><strong id="metric-drawdown">—<small>%</small></strong><p>基于每日收盘权益</p></article>
+            <article class="metric card"><span>交易胜率 <i>◎</i></span><strong id="metric-win">—<small>%</small></strong><p id="metric-trades">已平仓 0 笔交易</p></article>
+            <article class="metric card"><span>夏普比率 <i>∿</i></span><strong id="metric-sharpe">—</strong><p>无风险利率按 0 计算</p></article>
+          </section>
+          <section class="card chart-card" id="overview-section"><div class="chart-heading"><div><h2>累计净值</h2><p id="chart-subtitle">从每一次信号，看到策略的完整表现</p></div><div class="legend"><span><i></i>策略</span><span><i class="benchmark"></i>股票池等权</span></div></div><div class="chart-wrap" id="chart-wrap"><svg id="equity-chart" viewBox="0 0 900 285" role="img" aria-label="策略与股票池等权净值曲线"></svg><div id="chart-tooltip" class="chart-tooltip hidden"></div><div id="chart-empty" class="chart-empty"><div>⌁</div><strong>让数据验证你的想法</strong><span>运行回测后，在这里查看净值与回撤</span></div></div><div class="chart-footer"><span>收盘权益估值 · 含费用与滑点</span><span id="chart-summary">— 个交易日</span></div></section>
+          <section class="card detail-card" id="detail-section"><div class="detail-tabs" role="tablist"><button class="tab active" role="tab" data-tab="signals">候选股票 <span id="signal-count">0</span></button><button class="tab" role="tab" data-tab="trades">交易明细 <span id="trade-count">0</span></button><button class="tab" role="tab" data-tab="holdings">期末持仓 <span id="holding-count">0</span></button><button class="tab" role="tab" data-tab="history">回测历史</button></div><div class="table-toolbar"><div id="table-description">选股条件逐项核验</div><div><label id="only-match-label"><input type="checkbox" id="only-match">仅看符合条件</label><button class="text-button hidden" id="export-btn">↓ 导出 CSV</button></div></div><div class="table-scroll" id="table-container"><div class="empty-table">暂无结果，运行回测或尾盘选股后显示。</div></div></section>
+          <section class="method-card"><div class="method-icon">⌘</div><div><h3>每一条规则，都有明确的执行口径</h3><p id="rule-summary">总市值 50–200 亿 → 近 50 日有涨停 → 至少 7 日横盘 → 当日累计量 / 前 5 日均量 > 1.5 倍 → 当日尾盘买入</p><div class="method-tags"><span>✓ A 股 T+1</span><span>✓ 历史市值筛选</span><span>✓ 100 股整手</span><span>✓ 涨跌停成交约束</span></div><details id="method-details"><summary>查看数据来源与回测假设 <span>↗</span></summary><ul id="warnings-list"><li>先选择数据来源和区间。演示行情不代表真实市场表现。</li><li>仅为策略研究工具。实际成交受流动性、停牌及涨跌停等因素影响。</li></ul></details></div></section>
+        </div>
+      </div>
+      <footer class="page-footer"><span>WEIPAN LAB <i>·</i> 让策略经得起数据检验</span><span>AKShare 数据接口 <i>·</i> 本地回测引擎</span></footer>
+    </div>
+  </main>
+  <dialog id="candle-dialog" aria-labelledby="candle-title">
+    <div class="candle-header"><div><div class="eyebrow">TRADE REVIEW · 日线复盘</div><h2 id="candle-title">股票日 K</h2><p id="candle-source"></p></div><button class="dialog-close" id="candle-close" aria-label="关闭日K">×</button></div>
+    <div id="candle-loading" class="candle-loading"><span class="spinner"></span> 加载本次回测的原始行情…</div>
+    <div id="candle-error" class="error-panel hidden" role="alert"></div>
+    <div id="candle-content" class="hidden">
+      <div class="candle-trade-bar"><label>查看交易<select id="candle-trades" aria-label="选择交易"></select></label><button class="button" id="candle-prev">← 上一笔</button><button class="button" id="candle-next">下一笔 →</button><span id="candle-trade-summary"></span></div>
+      <div class="candle-toolbar"><div class="candle-legend"><span class="ma-fast">● <b id="candle-fast-label">MA3</b></span><span class="ma-slow">● <b id="candle-slow-label">MA5</b></span><span class="ma20">● MA20</span><span class="buy-legend">▲ 买入</span><span class="sell-legend">▼ 卖出</span></div><div class="candle-controls"><button class="button" id="candle-focus">定位交易</button><button class="button" data-candle-range="60">60 日</button><button class="button" data-candle-range="120">120 日</button><button class="button" data-candle-range="all">全部</button><button class="button" id="candle-zoom-in" aria-label="放大日K">＋</button><button class="button" id="candle-zoom-out" aria-label="缩小日K">−</button></div></div>
+      <div class="candle-quote" id="candle-quote">移动鼠标查看日期、价格与成交量</div>
+      <div class="candle-chart-wrap"><svg id="candle-chart" viewBox="0 0 1080 470" role="img" aria-label="股票日K、成交量、均线和回测买卖点"></svg></div>
+      <div class="candle-scroll"><span id="candle-range-label"></span><input id="candle-pan" type="range" min="0" max="100" value="0" aria-label="平移日K时间区间"><span>滚轮缩放 · 拖动滑块平移</span></div>
+      <p class="candle-footnote" id="candle-note"></p>
+      <p class="candle-footnote hidden" id="candle-entry-note"></p>
+    </div>
+  </dialog>
+  <div id="toast" class="toast hidden" role="status"></div>
+  <script src="/app.js"></script>
+  <script src="/candles.js"></script>
+</body>
+</html>
